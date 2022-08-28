@@ -10,3 +10,72 @@ knitr::opts_chunk$set(echo = TRUE)
 ```
 
 
+###Load Packages
+```{r}
+library(dplyr)
+library(ggplot2)
+library(tidyverse)
+```
+
+###Read in data
+```{r}
+MFpc <- read.csv("AllTrials_pH_PS_MS_082722.csv", na.strings = c("", "NA"))
+```
+
+###pH plot
+```{r}
+MFpH <- MFpc %>% 
+  filter(!is.na(pH)) %>% 
+  mutate(Day = as.factor(Day)) %>% 
+  group_by(Day)
+
+
+
+ggplot(data = MFpH, aes(x = factor(Day), y = pH, fill = factor(StorageTemp))) +
+  geom_boxplot() +
+  facet_grid(MFpH$PoreSize) +
+  scale_fill_manual(values=c("#56B4E9", "#009E73", "#D55E00")) +
+  theme(plot.title = element_text(face = "bold", hjust = 0.5)) +
+  xlab("Day") + ylab("pH") +
+  labs(color = "Storage Temperature (°C)", fill = "Storage Temperature (°C)") +
+  scale_y_continuous(limits = c(5, 7))
+
+ggsave("MFpH_082722.png", device = "png", type = "cairo")
+```
+###Particle Size plot
+```{r}
+MFps <- MFpc %>% 
+  filter(!is.na(ParticleSize)) %>% 
+  filter(ParticleSize != "laberror") %>% 
+  mutate(ParticleSize = as.numeric(as.character(ParticleSize))) %>% 
+  mutate(ParticleSize = log10(ParticleSize)) %>% 
+  mutate(Day = as.factor(Day)) %>% 
+  group_by(Day)
+
+
+ggplot(data = MFps, aes(x = factor(Day), y = ParticleSize, fill = factor(StorageTemp))) +
+  geom_boxplot() +
+  facet_grid(MFps$PoreSize) +
+  scale_fill_manual(values=c("#56B4E9", "#009E73", "#D55E00")) +
+  theme(plot.title = element_text(face = "bold", hjust = 0.5)) +
+  xlab("Day") + 
+  ylab(expression("Effective Diameter"  ~~log[10]~ (nm))) +
+  labs(color = "Storage Temperature (°C)", fill = "Storage Temperature (°C)") +
+  scale_y_continuous(limits = c(2, 5))
+
+ggsave("MFps_082722.png", device = "png", type = "cairo")
+
+MFps3 <- MFps %>% 
+  filter(StorageTemp == 3)
+
+ggplot(data = MFps, aes(x = factor(Day), y = ParticleSize, fill = factor(PoreSize))) +
+  geom_violin() +
+  scale_fill_manual(values=c("#56B4E9", "#D55E00")) +
+  theme(plot.title = element_text(face = "bold", hjust = 0.5)) +
+  xlab("Day") + 
+  ylab(expression("Effective Diameter"  ~~log[10]~ (nm))) +
+  labs(color = "Storage Temperature (°C)", fill = "Storage Temperature (°C)") +
+  scale_y_continuous(limits = c(0, 3))
+
+ggsave("MFps_082722.png", device = "png", type = "cairo")
+```
