@@ -1,0 +1,398 @@
+---
+title: "Shelf-life extension of microfiltered milk does not differ between skim milk and whole milk produced by addition of HTST treated but non-microfiltered cream"
+author: "T.T. LOTT"
+date: "11/21/22"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+#Load packages
+```{r}
+library(dplyr)
+library(vegan)
+library(ggplot2)
+library(readr)
+library(tidyverse)
+library(wesanderson)
+library(indicspecies)
+```
+
+###Data reading
+```{r}
+##read in raw data
+
+allisos <- read.csv("Iso_Summary_110822.csv", na.strings = c("", "NA")) %>% 
+  filter(MilkType != "BuffCont")
+```
+
+
+###Data transformation and filtering
+```{r}
+#filter isolates that are characterized
+character <- allisos %>% 
+  filter(!is.na(rpoBAT) | !is.na(Genus) | !is.na(Family))
+
+#filter isolates that have been characterized with rpoB
+rpoBs <- character %>% 
+  filter(!is.na(rpoBAT))
+
+#filter isolates that were not characterized with rpoB (16S)
+notrpoB <- character %>% 
+  filter(is.na(rpoBAT))
+
+
+#filter isolates that were characterized from shelf-life samples
+shelflife <- character %>% 
+  filter(Day != 0)
+
+#filter shelf-life isolates that were characterized with rpoB
+rpoBshelf <- shelflife %>% 
+  filter(!is.na(rpoBAT))
+
+#filter isolates that were characterized with 16S
+s16shelf <- shelflife %>% 
+  filter(is.na(rpoBAT))
+
+#remove shelf-life duplicates
+nodupes <- shelflife %>% 
+    distinct(Trial, MilkType, PoreSize, StorageTemp, Day, Family, Genus, Species, rpoBAT)
+
+#find isolates that were characterized as Gram negative
+gramneg <- shelflife %>% 
+  filter(Gramstain == "negative")
+
+#remove gram negatives from shelf-life data as these isolates are evidence of post-pasteurization contamination
+grampositive <- shelflife %>% 
+  filter(Gramstain == "positive")
+
+#filter for shelf-life isolates that were characteried as positive. Include only distinct, then mutate the data frame to add columns for species and ATs by using paste function
+allshelflife <- allisos %>% 
+  filter(Day != 0) %>% 
+  filter(Gramstain == "positive") %>% 
+  filter(is.na(X)) %>% 
+  distinct(Trial, MilkType, PoreSize, StorageTemp, Day, Family, Genus, Species, rpoBAT) %>% 
+  mutate(ATtaxon = paste(Genus, Species, rpoBAT, sep = " ")) %>% 
+  mutate(Bacteria = paste(Genus, Species, sep = " ")) 
+```
+
+###Characterization plots
+```{r}
+
+#Create barchart for species by trial
+ggplot(data=allshelflife, aes(x=Trial, fill = Bacteria)) +
+  geom_bar(position = "fill") + 
+  xlab("Trial") + ylab("Proportion")
+
+ggsave("mfCharacterTrial.jpeg", type = "cairo")
+
+#create barchart for species by pore size
+ggplot(data=allshelflife, aes(x=factor(PoreSize), fill = Bacteria)) +
+  geom_bar(position = "fill") +
+  xlab("Pore Size") + ylab("Proportion")
+
+ggsave("mfCharacterPoreSize.jpeg", type = "cairo")
+
+#create bar chart for species by Milk type
+ggplot(data=allshelflife, aes(x=MilkType, fill = Bacteria)) +
+  geom_bar(position = "fill") +
+  xlab("Milk Type") + ylab("Proportion")
+
+ggsave("mfCharacterMilkType.jpeg", type = "cairo")
+
+#create barchart for species by storage temp
+ggplot(data=allshelflife, aes(x=factor(StorageTemp), fill = Bacteria)) +
+  geom_bar(position = "fill")  +
+  xlab("Storage Temperature") + ylab("Proportion") 
+
+ggsave("mfCharacterStorageTemp.jpeg", type = "cairo")
+```
+
+
+###NMDS at level of AT
+```{r}
+#create a matrix summarizing Unique AT presence/absence per Trial-HTST_Temp-Storage_Temp
+atmatrix <- allshelflife %>% 
+  filter(!is.na(rpoBAT)) %>% 
+  group_by(Trial, MilkType, PoreSize, StorageTemp, Family, ATtaxon) %>% 
+  summarise(n()) %>%
+  mutate(presence = 1) %>%
+  pivot_wider(id_cols = c(Trial, MilkType, PoreSize, StorageTemp), names_from = ATtaxon, values_from = presence, values_fill = 0)
+
+#NMDS with AT Matrix
+set.seed(88)
+AT.nmds = metaMDS(atmatrix[,-1:-4],
+                     k=2, trymax=100)
+
+#No convergence, run NMDS again after removing single values
+
+atmatrix_no1 <- atmatrix[colSums(atmatrix[, c(-1:-4)], na.rm=TRUE)] 
+
+colSums(oldDF[, colsInclude], na.rm=T)  
+
+#Filter out rows Trial-HTST-Storage (THS) where only 1 AT was present
+atmatrix <- atmatrix[rowSums(atmatrix[,-1:-4])>1,]
+
+#Refilter out where unique AT was only present =1 in across all Trial-HTST-Storage (THS) after filtering out rows
+Hyp1AT_noSingles <- Hyp1AT_Trial[,(colSums(Hyp1AT_Trial)>1)]
+
+Hyp1AT_noSingles <- Hyp1AT_noSingles[rowSums(Hyp1AT_noSingles[,-1:-3])>1,]
+
+#check row and column sums to ensure all >1
+rowSums(Hyp1AT_noSingles[,-1:-3])
+
+colSums(Hyp1AT_noSingles[,-1:-3])
+
+#convert factors back from numerics
+Hyp1AT_noSingles <- Hyp1AT_noSingles %>% 
+  mutate(Storage_Temp = as.factor(Storage_Temp)) %>% 
+  mutate(HTST_Temp = as.factor(HTST_Temp)) %>% 
+  mutate(Trial = as.factor(Trial))
+
+#NMDS after removing singles
+set.seed(88)
+Hyp1_AT.nmds2 = metaMDS(Hyp1AT_noSingles[,-1:-3],
+                     k=2, trymax=100)
+
+#convergence reached
+
+#extract NMDS scores (x and y coordinates)
+data.scores = as.data.frame(scores(Hyp1_AT.nmds2))
+
+#add columns to data frame 
+data.scores$Trial = Hyp1AT_noSingles$Trial
+data.scores$HTST_Temp = Hyp1AT_noSingles$HTST_Temp
+data.scores$Storage_Temp = Hyp1AT_noSingles$Storage_Temp
+ 
+head(data.scores)
+
+#NMDS plot
+#need to first reorder legend order
+data.scores$Storage_Temp <- factor(data.scores$Storage_Temp, levels = c("3", "6.5", "10"))
+
+ggplot(data.scores, aes(x = NMDS1, y = NMDS2)) + 
+    geom_point(size = 4, aes(shape = HTST_Temp, colour = Storage_Temp))+ 
+    theme(axis.text.y = element_text(colour = "black", size = 12, face = "bold"), 
+    axis.text.x = element_text(colour = "black", face = "bold", size = 12), 
+    legend.text = element_text(size = 12, face ="bold", colour ="black"), 
+    legend.position = "right", axis.title.y = element_text(face = "bold", size = 14), 
+    axis.title.x = element_text(face = "bold", size = 14, colour = "black"), 
+    legend.title = element_text(size = 14, colour = "black", face = "bold"), 
+    panel.background = element_blank(), panel.border = element_rect(colour = "black", fill = NA, size = 1.2),
+    legend.key=element_blank()) + 
+    labs(x = "NMDS1", colour = "Storage Temperature (\u00B0C)", y = "NMDS2", shape = "HTST Temperature (\u00B0C)")  + 
+    scale_colour_manual(values = c("#0072B2", "#009E73", "#E69F00"))
+
+
+#ANOSIM
+set.seed(88)
+
+Ano_AT_Trial = anosim(Hyp1AT_noSingles[,-1:-3], Hyp1AT_noSingles$Trial, permutations = 9999)
+
+Ano_AT_HTST = anosim(Hyp1AT_noSingles[,-1:-3], Hyp1AT_noSingles$HTST_Temp, permutations = 9999)
+
+Ano_AT_Stor = anosim(Hyp1AT_noSingles[,-1:-3], Hyp1AT_noSingles$Storage_Temp, permutations = 9999)
+
+Ano_AT_Trial
+Ano_AT_HTST
+Ano_AT_Stor
+
+#Only storage temperature was significant, continue with pairwise analyses
+#indicator species package for identifying significant differences
+set.seed(88)
+Sig_AT_Stor = multipatt(Hyp1AT_noSingles[,-1:-3], Hyp1AT_noSingles$Storage_Temp, control = how(nperm=9999))
+
+summary(Sig_AT_Stor)
+```
+
+###NMDS at level of species
+```{r}
+
+#create a matrix summarizing Unique species presence/absence per Trial-HTST_Temp-Storage_Temp
+speciesmatrix <- shelflife %>% 
+  filter(!is.na(Species)) %>% 
+  group_by(Trial, MilkType, PoreSize, StorageTemp, Bacteria) %>% 
+  summarise(n()) %>%
+  mutate(presence = 1) %>%
+  pivot_wider(id_cols = c(Trial, MilkType, PoreSize, StorageTemp), names_from = Bacteria, values_from = presence, values_fill = 0)
+
+#NMDS with species Matrix
+set.seed(88)
+species.nmds = metaMDS(speciesmatrix[,-1:-4],
+                     k=2, trymax=1000)
+
+#convergence reached; however, single values are affecting plot and data scores
+
+#remove singles
+
+#must first convert factors to numerics
+Hyp1s_matrixnum <- speciesmatrix %>% 
+  mutate(Trial = as.numeric(levels(Trial))[Trial]) %>% 
+  mutate(HTST_Temp = as.numeric(levels(HTST_Temp))[HTST_Temp]) %>% 
+  mutate(Storage_Temp = as.numeric(levels(Storage_Temp))[Storage_Temp])
+
+#Filter out where unique species was only present n=1 across all Trial-HTST-Storage (THS)
+Hyp1_spp <- Hyp1s_matrixnum[,(colSums(Hyp1s_matrixnum)>1)]
+
+#Filter out rows Trial-HTST-Storage (THS) where only 1 species was present
+Hyp1s_Trial <- Hyp1_spp[rowSums(Hyp1_spp[,-1:-3])>1,]
+
+#Refilter out where unique species was only present =1 in across all Trial-HTST-Storage (THS) after filtering out rows
+Hyp1s_noSingles <- Hyp1s_Trial[,(colSums(Hyp1s_Trial)>1)]
+
+Hyp1s_noSingles <- Hyp1s_noSingles[rowSums(Hyp1s_noSingles[,-1:-3])>1,]
+
+#check row and column sums to ensure all >1
+rowSums(Hyp1s_noSingles[,-1:-3])
+
+colSums(Hyp1s_noSingles[,-1:-3])
+
+#convert factors back from numerics
+Hyp1s_noSingles <- Hyp1s_noSingles %>% 
+  mutate(Storage_Temp = as.factor(Storage_Temp)) %>% 
+  mutate(HTST_Temp = as.factor(HTST_Temp)) %>% 
+  mutate(Trial = as.factor(Trial))
+
+#NMDS with species Matrix
+set.seed(88)
+Hyp1_spp.nmds2 = metaMDS(Hyp1s_noSingles[,-1:-3],
+                     k=2, trymax=100)
+
+
+#extract NMDS scores (x and y coordinates)
+data.scores_spp = as.data.frame(scores(species.nmds))
+
+#add columns to data frame 
+data.scores_spp$Trial = speciesmatrix$Trial
+data.scores_spp$MilkType = speciesmatrix$MilkType
+data.scores_spp$StorageTemp = speciesmatrix$StorageTemp
+data.scores_spp$PoreSize = speciesmatrix$PoreSize
+ 
+head(data.scores_spp)
+
+#plot 
+
+ggplot(data.scores_spp, aes(x = NMDS1, y = NMDS2)) + 
+    geom_point(size = 4, aes(shape = factor(StorageTemp), colour = factor(PoreSize)))+ 
+    theme(axis.text.y = element_text(colour = "black", size = 12, face = "bold"), 
+    axis.text.x = element_text(colour = "black", face = "bold", size = 12), 
+    legend.text = element_text(size = 12, face ="bold", colour ="black"), 
+    legend.position = "right", axis.title.y = element_text(face = "bold", size = 14), 
+    axis.title.x = element_text(face = "bold", size = 14, colour = "black"), 
+    legend.title = element_text(size = 14, colour = "black", face = "bold"), 
+    panel.background = element_blank(), panel.border = element_rect(colour = "black", fill = NA, size = 1.2),
+    legend.key=element_blank()) + 
+    labs(x = "NMDS1", colour = "Storage Temperature (\u00B0C)", y = "NMDS2", shape = "HTST Temperature (\u00B0C)")  + 
+    scale_colour_manual(values = wes_palette("Darjeeling1", n=3)) 
+  
+
+#ANOSIM
+
+Ano_spp_StorageTemp = anosim(speciesmatrix[,-1:-4], speciesmatrix$StorageTemp, permutations = 9999)
+
+Ano_spp_StorageTemp
+#significant
+
+Ano_spp_PoreSize = anosim(speciesmatrix[,-1:-4], speciesmatrix$PoreSize, permutations = 9999)
+
+Ano_spp_PoreSize
+#not significant
+
+
+Ano_spp_MilkType = anosim(speciesmatrix[,-1:-4], speciesmatrix$MilkType, permutations = 9999)
+
+Ano_spp_MilkType
+#not significant
+
+Ano_spp_Trial = anosim(speciesmatrix[,-1:-4], speciesmatrix$Trial, permutations = 9999)
+
+Ano_spp_Trial
+#significant
+
+#indicator species package for identifying significant differences
+sig_spp_stor = multipatt(speciesmatrix[,-1:-4], speciesmatrix$StorageTemp, control = how(nperm=9999))
+
+summary(sig_spp_stor)
+
+sig_spp_trial = multipatt(speciesmatrix[,-1:-4], speciesmatrix$Trial, control = how(nperm=9999))
+
+summary(sig_spp_trial)
+
+sig_spp_pore = multipatt(speciesmatrix[,-1:-4], speciesmatrix$PoreSize, control = how(nperm=9999))
+
+summary(sig_spp_pore)
+
+
+```
+
+
+###NMDS at level of genus
+```{r}
+
+#create a matrix summarizing Unique genus presence/absence per Trial-HTST_Temp-Storage_Temp
+genusmatrix <- shelflife %>% 
+  filter(!is.na(Species)) %>% 
+  group_by(Trial, MilkType, PoreSize, StorageTemp, Genus) %>% 
+  summarise(n()) %>%
+  mutate(presence = 1) %>%
+  pivot_wider(id_cols = c(Trial, MilkType, PoreSize, StorageTemp), names_from = Genus, values_from = presence, values_fill = 0)
+
+#NMDS with genus Matrix
+set.seed(88)
+genus.nmds = metaMDS(genusmatrix[,-1:-4],
+                     k=2, trymax=10000)
+
+#convergence reached
+
+#extract NMDS scores (x and y coordinates)
+data.scores_g = as.data.frame(scores(Hyp1_g.nmds))
+
+#add columns to data frame 
+data.scores_g$Trial = Hyp1g_matrix$Trial
+data.scores_g$HTST_Temp = Hyp1g_matrix$HTST_Temp
+data.scores_g$Storage_Temp = Hyp1g_matrix$Storage_Temp
+ 
+head(data.scores_g)
+
+#plot 
+
+ggplot(data.scores_g, aes(x = NMDS1, y = NMDS2)) + 
+    geom_point(size = 4, aes(shape = HTST_Temp, colour = Storage_Temp))+ 
+    theme(axis.text.y = element_text(colour = "black", size = 12, face = "bold"), 
+    axis.text.x = element_text(colour = "black", face = "bold", size = 12), 
+    legend.text = element_text(size = 12, face ="bold", colour ="black"), 
+    legend.position = "right", axis.title.y = element_text(face = "bold", size = 14), 
+    axis.title.x = element_text(face = "bold", size = 14, colour = "black"), 
+    legend.title = element_text(size = 14, colour = "black", face = "bold"), 
+    panel.background = element_blank(), panel.border = element_rect(colour = "black", fill = NA, size = 1.2),
+    legend.key=element_blank()) + 
+    labs(x = "NMDS1", colour = "Storage Temperature (\u00B0C)", y = "NMDS2", shape = "HTST Temperature (\u00B0C)")  + 
+    scale_colour_manual(values = wes_palette("Darjeeling1", n=3)) 
+  
+
+#ANOSIM
+Ano_g_HTST = anosim(Hyp1g_matrix[,-1:-3], Hyp1g_matrix$HTST_Temp, permutations = 9999)
+
+Ano_g_HTST
+
+Ano_g_Trial = anosim(Hyp1g_matrix[,-1:-3], Hyp1g_matrix$Trial, permutations = 9999)
+
+Ano_g_Trial
+
+Ano_g_Stor = anosim(Hyp1g_matrix[,-1:-3], Hyp1g_matrix$Storage_Temp, permutations = 9999)
+
+Ano_g_Stor
+
+#indicator species package for identifying significant differences
+Sig_g_Stor = multipatt(Hyp1g_matrix[,-1:-3], Hyp1g_matrix$Storage_Temp, control = how(nperm=9999))
+
+summary(Sig_g_Stor)
+
+Sig_g_trial = multipatt(Hyp1g_matrix[,-1:-3], Hyp1g_matrix$Trial, control = how(nperm=9999))
+
+summary(Sig_g_Stor)
+
+summary(Sig_g_trial)
+```
