@@ -1,0 +1,195 @@
+---
+title: "mfALLSum"
+author: "Tim L"
+date: "052522"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown                      
+
+```{r}
+library(dplyr)
+library(tidyverse)
+library(ggplot2)
+library(wesanderson)
+library(lme4)
+library(emmeans)
+library(lmerTest)
+library(effectsize)
+```
+
+##Read in and check data
+```{r}
+mfALLpc <- read.csv("ShelfLife_Data.csv", na.strings = c("", "NA"))
+
+#remove TNTC, PPC, and Lab Errors
+mfkeep <- mfALLpc %>% 
+  filter(ExtraInfo != "TNTC" & ExtraInfo != "PPC" & ExtraInfo != "ERROR")
+```
+
+```{r}
+##MF APC jitter plots w/ trendline, one for each temperature (3C, 6.5C, 10C), separated by milk type
+
+#Mutate data to summarize APC data grouped by Trial, Pore Size, Storage Temperature, and Day
+mfrepslog <- mfkeep %>% 
+  filter(MilkType == "Skim" | MilkType == "Whole") %>% 
+  filter(PlateType == "SPC") %>% 
+  filter(!is.na(StorageTemp)) %>% 
+  mutate(Concentration = replace(Concentration, Concentration==0, 5)) %>% 
+  mutate(Concentration = log10(Concentration)) %>%
+  group_by(Trial, PoreSize, MilkType, StorageTemp, Day) %>% 
+  summarise_at(c("Concentration"), mean, na.rm = TRUE) %>% 
+  mutate(PoreSize = factor(PoreSize)) %>% 
+  mutate(StorageTemp = factor(StorageTemp)) %>% 
+  mutate(Day = as.character(Day)) %>% 
+  mutate(Day = as.numeric(Day)) %>% 
+  mutate(Trial = factor(Trial))
+
+#3C APC plot (All trials)
+mfrepslog3 <- mfALLpc %>% 
+  filter(MilkType == "Skim" | MilkType == "Whole") %>% 
+  filter(PlateType == "SPC") %>% 
+  filter(!is.na(StorageTemp)) %>% 
+  mutate(Concentration = replace(Concentration, Concentration==0, 5)) %>% 
+  mutate(Concentration = log10(Concentration)) %>% 
+  group_by(Trial, PoreSize, MilkType, StorageTemp, Day) %>% 
+  summarise_at(c("Concentration"), mean, na.rm = TRUE) %>% 
+  mutate(PoreSize = factor(PoreSize)) %>% 
+  mutate(StorageTemp = factor(StorageTemp)) %>% 
+  mutate(Day = as.character(Day)) %>% 
+  mutate(Day = as.numeric(Day)) %>% 
+  mutate(Trial = factor(Trial)) %>% 
+  filter(StorageTemp == 3)
+
+ggplot(data=mfrepslog3, aes(x=as.numeric(Day), y=Concentration, color = PoreSize)) +
+  geom_jitter() +
+  facet_grid(MilkType ~ ., scales = "free_y") +
+  scale_y_continuous(limits = c(0,10), breaks = c(1,2,3,4,5,6,7,8,9), expand = c(0, 0)) +
+  scale_x_continuous(breaks = c(0,7,14,21,28,35,42,49,56,63)) +
+  scale_color_manual(values = c("#E69F00", "#0072B2")) +
+  ggtitle("(a)") +
+  theme(plot.title = element_text(face = "bold", hjust = 0.5)) +
+  xlab("Day") + ylab(expression(~~log[10]~ cfu/mL)) +
+  labs(color="Pore Size (μm)") +
+  geom_smooth(se = FALSE) +
+  theme(plot.title = element_text(hjust = 0)) +
+  theme(axis.text=element_text(size=10))
+
+
+#ggsave("mfALL3C-geomjitter_trendline051023.jpeg", device = "jpg", type = "cairo" , dpi = 600)
+
+
+#6.5C APC Plot
+mfrepslog6.5 <- mfALLpc %>% 
+  filter(MilkType == "Skim" | MilkType == "Whole") %>% 
+  filter(PlateType == "SPC") %>% 
+  filter(!is.na(StorageTemp)) %>% 
+  mutate(Concentration = replace(Concentration, Concentration==0, 5)) %>% 
+  mutate(Concentration = log10(Concentration)) %>% 
+  group_by(Trial, PoreSize, MilkType, StorageTemp, Day) %>% 
+  summarise_at(c("Concentration"), mean, na.rm = TRUE) %>% 
+  mutate(PoreSize = factor(PoreSize)) %>% 
+  mutate(StorageTemp = factor(StorageTemp)) %>% 
+  mutate(Day = as.character(Day)) %>% 
+  mutate(Day = as.numeric(Day)) %>% 
+  mutate(Trial = factor(Trial)) %>% 
+  filter(StorageTemp == 6.5)
+
+ggplot(data=mfrepslog6.5, aes(x=as.numeric(Day), y=Concentration, color = PoreSize)) +
+  geom_jitter() +
+  facet_grid(MilkType ~ ., scales = "free_y") +
+scale_y_continuous(limits = c(0,10), breaks = c(1,2,3,4,5,6,7,8,9), expand = c(0, 0)) +
+scale_x_continuous(breaks = c(0,7,14,21,28,35,42,49,56,63)) +
+scale_color_manual(values = c("#E69F00", "#0072B2")) +
+ggtitle("(b)") +
+theme(plot.title = element_text(face = "bold", hjust = 0.5)) +
+xlab("Day") + ylab(expression(~~log[10]~ cfu/mL)) +
+  labs(color="Pore Size (μm)") +
+  geom_smooth(se = FALSE) +
+  theme(axis.text=element_text(size=10)) +
+  theme(plot.title = element_text(hjust = 0))
+
+#ggsave("mfALL6.5C-geomjitter_trendline051023.jpeg", device = "jpg", type = "cairo", dpi = 600)
+
+#10C APC plot
+mfrepslog10 <- mfALLpc %>% 
+  filter(MilkType == "Skim" | MilkType == "Whole") %>% 
+  filter(PlateType == "SPC") %>% 
+  filter(!is.na(StorageTemp)) %>% 
+  mutate(Concentration = replace(Concentration, Concentration==0, 5)) %>% 
+  mutate(Concentration = log10(Concentration)) %>% 
+  group_by(Trial, PoreSize, MilkType, StorageTemp, Day) %>% 
+  summarise_at(c("Concentration"), mean, na.rm = TRUE) %>% 
+  mutate(PoreSize = factor(PoreSize)) %>% 
+  mutate(StorageTemp = factor(StorageTemp)) %>% 
+  mutate(Day = as.character(Day)) %>% 
+  mutate(Day = as.numeric(Day)) %>% 
+  mutate(Trial = factor(Trial)) %>% 
+  filter(StorageTemp == 10)
+
+ggplot(data=mfrepslog10, aes(x=as.numeric(Day), y=Concentration, color = PoreSize)) +
+  geom_jitter() +
+  facet_grid(MilkType ~ ., scales = "free_y") +
+scale_y_continuous(limits = c(0,10), breaks = c(1,2,3,4,5,6,7,8,9), expand = c(0, 0)) +
+scale_x_continuous(breaks = c(0,7,14,21,28,35,42,49,56,63)) +
+scale_color_manual(values = c("#E69F00", "#0072B2")) +
+ggtitle("(c)") +
+theme(plot.title = element_text(face = "bold", hjust = 0.5)) +
+xlab("Day") + ylab(expression(~~log[10]~ cfu/mL)) +
+  labs(color="Pore Size (μm)") +
+  geom_smooth(se = FALSE) +
+    theme(axis.text=element_text(size=10)) +
+  theme(plot.title = element_text(hjust = 0))
+
+#ggsave("mfALL10C-geomjitter_trendline051023.jpeg", device = "jpg", type = "cairo", dpi = 600)
+```
+
+
+##Statistical Analyses
+```{r}
+#mutate data for analyses
+mflogAPC_aov <- mfkeep %>% 
+  filter(MilkType == "Skim" | MilkType == "Whole") %>% 
+  filter(PlateType == "SPC") %>% 
+  filter(!is.na(StorageTemp)) %>% 
+  mutate(Concentration = replace(Concentration, Concentration==0, 5)) %>% 
+  mutate(Concentration = log10(Concentration)) %>% 
+  group_by(PoreSize, MilkType, StorageTemp, Day, Trial) %>% 
+  mutate(PoreSize = factor(PoreSize)) %>% 
+  mutate(StorageTemp = factor(StorageTemp)) %>% 
+  mutate(Day = as.character(Day)) %>% 
+  mutate(Day = as.numeric(Day))
+
+#write linear mixed effects regression model for ANOVA
+APCaov <- lmer(Concentration ~ PoreSize + MilkType + StorageTemp + Day + StorageTemp*Day + StorageTemp*PoreSize + (1|Trial) + (1|Trial:PoreSize) + (1|Trial:PoreSize:MilkType) + (1|Trial:PoreSize:MilkType:StorageTemp) + (1|Trial:PoreSize:MilkType:StorageTemp:Day), data = mflogAPC_aov)
+
+#summarize
+anova(APCaov)
+
+summary(APCaov)
+
+emmeans(APCaov, ~ PoreSize + StorageTemp + Day + MilkType, at = list(Day = c(0, 7, 14, 21, 28, 35, 42, 49, 56, 63)))
+
+#plot to show predictor effects
+emmip(APCaov, StorageTemp ~ Day | MilkType + PoreSize, at = list(Day = c(0, 35, 63)))
+
+#milk type not significant in model, plot with milk types grouped
+emmip(APCaov, StorageTemp ~ Day | PoreSize, at = list(Day = c(0, 35, 63)))
+
+#pairwise
+emmeans(APCaov,  pairwise ~ MilkType |  StorageTemp | Day | PoreSize, adjust = "none")
+
+emmeans(APCaov, pairwise ~ StorageTemp)
+
+emmeans(APCaov, pairwise ~ PoreSize)
+
+#effect size
+eta_squared(APCaov, partial = FALSE)
+```
+
+
+

@@ -1,0 +1,160 @@
+---
+title: "MF_physiocochemical"
+author: "Tim L"
+date: '2022-08-27'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+
+###Load Packages
+```{r}
+library(dplyr)
+library(ggplot2)
+library(tidyverse)
+```
+
+###Read in data
+```{r}
+MFpc <- read.csv("Physiocochemical_data.csv", na.strings = c("", "NA"))
+```
+
+###pH plot
+```{r}
+
+#filter for only pH data
+MFpH <- MFpc %>% 
+  filter(!is.na(pH)) %>% 
+  filter(GramNeg == "KEEP") %>% 
+  mutate(Day = as.factor(Day)) %>% 
+  group_by(Day)
+
+#plot pH data by pore size
+ggplot(data = MFpH, aes(x = factor(Day), y = pH, fill = factor(StorageTemp))) +
+  geom_boxplot() +
+  facet_grid(MFpH$PoreSize) +
+  scale_fill_manual(values=c("#56B4E9", "#F0E442", "#D55E00")) +
+  theme(plot.title = element_text(face = "bold")) +
+  xlab("Day") + ylab("pH") +
+  ggtitle("(a)") +
+  labs(color = "Storage Temperature (°C)", fill = "Storage Temperature (°C)") +
+  scale_y_continuous(limits = c(5, 7))
+
+ggsave("MFporesizepH_051023.jpeg", device = "jpg", type = "cairo", dpi = 600)
+
+#plot pH data by milk type
+ggplot(data = MFpH, aes(x = factor(Day), y = pH, fill = factor(StorageTemp))) +
+  geom_boxplot() +
+  facet_grid(MFpH$MilkType) +
+  scale_fill_manual(values=c("#56B4E9", "#F0E442", "#D55E00")) +
+  theme(plot.title = element_text(face = "bold")) +
+  ggtitle("(b)") +
+  xlab("Day") + ylab("pH") +
+  labs(color = "Storage Temperature (°C)", fill = "Storage Temperature (°C)") +
+  scale_y_continuous(limits = c(5, 7))
+
+ggsave("MFmilktypepH_051023.jpeg", device = "jpg", type = "cairo", dpi = 600)
+```
+
+###Particle Size plot
+```{r}
+#filter for particle size data
+MFps <- MFpc %>% 
+  filter(!is.na(ParticleSize)) %>% 
+  filter(GramNeg == "KEEP") %>% 
+  mutate(ParticleSize = as.numeric(as.character(ParticleSize))) %>% 
+  mutate(Day = as.factor(Day)) %>%
+  filter(!is.na(ParticleSize)) %>% 
+  mutate(MilkType = replace(MilkType, MilkType == "skim ", "skim")) %>% 
+  group_by(Trial, PoreSize, MilkType, StorageTemp) %>% 
+  filter(is.na(Coagulated)) %>% 
+  filter()
+
+#filter particle size data for skim milk only
+MFpsskim <- MFps %>% 
+  filter(MilkType == "skim")
+
+#filter particle size data for whole milk only
+MFpswhole <- MFps %>% 
+  filter(MilkType == "whole")
+
+
+#plot skim milk particle size data
+ggplot(data = MFpsskim, aes(x = factor(Day), y = ParticleSize, color = factor(StorageTemp))) +
+geom_pointrange(position = position_dodge(width = 1),
+    mapping = aes(x = factor(Day), y = ParticleSize),
+    stat = "summary",
+    fun.min = min,
+    fun.max = max,
+    fun = mean) +
+  facet_grid(MFpsskim$PoreSize) +
+  scale_color_manual(values=c("#56B4E9", "#DDCC77", "#D55E00")) +
+  theme(plot.title = element_text(face = "bold")) +
+  ggtitle("(c)") +
+  xlab("Day") + 
+  ylab(expression("Effective Diameter (nm)")) +
+  labs(color = "Storage Temperature (°C)", fill = "Storage Temperature (°C)") +
+  geom_smooth(aes(group = 1), se = FALSE, color = "black", size = 0.5)
+
+ggsave("particlesizeSKIM051023.jpeg", device = "jpg", type = "cairo", dpi = 600)
+
+
+#plot whole milk particle size data
+ggplot(data = MFpswhole, aes(x = factor(Day), y = ParticleSize, color = factor(StorageTemp))) +
+geom_pointrange(position = position_dodge(width = 1),
+    mapping = aes(x = factor(Day), y = ParticleSize),
+    stat = "summary",
+    fun.min = min,
+    fun.max = max,
+    fun = mean) +
+  facet_grid(MFpswhole$PoreSize) +
+  scale_color_manual(values=c("#56B4E9", "#DDCC77", "#D55E00")) +
+  theme(plot.title = element_text(face = "bold")) +
+  ggtitle("(d)") +
+  xlab("Day") + 
+  ylab(expression("Effective Diameter (nm)")) +
+  labs(color = "Storage Temperature (°C)", fill = "Storage Temperature (°C)") +
+    geom_smooth(aes(group = 1), se = FALSE, color = "black", size = 0.5)
+
+ggsave("particlesizeWHOLE051023.jpeg", device = "jpg", type = "cairo", dpi = 600)
+```
+
+###milkoscan
+```{r}
+#summarize milkoscan data
+components <- MFpc %>% 
+  filter(!is.na(CompMethod)) %>% 
+  filter(CompMethod == "milkoscan") %>% 
+  group_by(Trial, PoreSize, MilkType) %>% 
+  summarise_at(c("Fat", "Protein", "Lactose", "TS", "SnF"), mean, na.rm = TRUE)
+
+componentsall <- components %>% 
+  ungroup() %>% 
+  group_by(PoreSize, MilkType) %>% 
+  summarise_at(c("Fat", "Protein", "Lactose", "TS", "SnF"), mean, na.rm = TRUE) 
+
+#for summarizing protein retention
+mfreduct <- components %>% 
+  filter(MilkType == "rawskim" | MilkType == "mfskim")
+
+  
+```
+
+
+```{r}
+#summarize freezing point depression
+
+freezept <- MFpc %>% 
+  filter(!is.na(FreezePt)) %>% 
+  mutate(FreezePt = -.001*FreezePt) %>% 
+  filter(is.na(bottlenum)) %>% 
+  filter(is.na(pumptype)) %>% 
+  group_by(Trial, MilkType, pumptype) %>% 
+  mutate(FreezePt = ((0.96418*FreezePt)+0.00085))
+
+
+```
+

@@ -1,0 +1,111 @@
+---
+title: "RawMilk_Code"
+author: "Tim L"
+date: '2022-10-18'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+###Load Packages
+```{r}
+library(dplyr)
+library(tidyverse)
+
+```
+
+###Read Data
+```{r}
+##CSV file with raw data
+Raw.csv <- read.csv("RawMilk_Data.csv", na.strings = c("", "NA"))
+```
+
+###Transform data: Set detection limits and convert to log10
+```{r}
+rawtrans <- Raw.csv %>% 
+  mutate(Concentration = as.numeric(as.character(Concentration))) %>% 
+  mutate(Concentration = ifelse(PlateType == "MSC" & Concentration == 0 & Dilution == 0, 0.25, Concentration)) %>% 
+  mutate(Concentration = ifelse(PlateType == "MSC" & Concentration == 0 & Dilution == 10, 2.5, Concentration)) %>% 
+  mutate(Concentration = ifelse(PlateType == "PSC" & Concentration == 0 & Dilution == 0, 0.25, Concentration)) %>% 
+  mutate(Concentration = ifelse(PlateType == "PSC" & Concentration == 0 & Dilution == 10, 2.5, Concentration)) %>% 
+  mutate(Concentration = ifelse(PlateType == "APC" & Concentration == 0, 5, Concentration)) %>% 
+  mutate(Concentration = log10(Concentration))
+```
+
+###Calculate raw plate count means
+```{r}
+#All means
+rawmeans <- rawtrans %>% 
+  group_by(Trial, PoreSize, MilkType, PlateType) %>% 
+  summarise(meanConcentration = mean(Concentration))
+
+#Raw skim, raw cream, mf skim, htst cream APC, MSC, and PSC
+rawmeansub <- rawmeans %>% 
+  filter(PlateType == "APC" | PlateType == "MSC" | PlateType == "PSC") %>% 
+  filter(MilkType == "rawskim" | MilkType == "mfskim" | MilkType == "htstcream" | MilkType == "rawcream") %>% 
+  filter(PoreSize != "BOTH" & MilkType == "rawskim" | MilkType == "mfskim" | MilkType == "htstcream" | MilkType == "rawcream")
+
+rawmilktrial <- rawmeansub %>% 
+  ungroup() %>% 
+  group_by(Trial, MilkType, PlateType) %>% 
+  summarise(mean = mean(meanConcentration))
+
+rawmilk <- rawmeans %>% 
+  ungroup() %>% 
+  group_by(MilkType, PlateType) %>% 
+  summarise(meanAPC = mean(meanConcentration))
+
+rawmilksub <- rawmeansub %>% 
+  ungroup() %>% 
+  group_by(MilkType, PlateType) %>% 
+  summarise(meanAPC = mean(meanConcentration))
+
+rawmilksubpore <- rawmeansub %>% 
+  ungroup() %>% 
+  group_by(PoreSize, MilkType, PlateType) %>% 
+  summarise(meanAPC = mean(meanConcentration))
+
+rawporesize <- rawmeans %>% 
+  ungroup() %>% 
+  group_by(MilkType, PlateType, PoreSize) %>% 
+  summarise(meanAPC = mean(mean))
+
+```
+
+###Raw Milk (whole pre-separation)
+```{r}
+##trial level
+trial <- rawmeans %>% 
+  ungroup() %>% 
+  group_by(Trial, MilkType, PlateType) %>% 
+  summarise(trialmean = mean(meanConcentration))
+
+#raw milk apc
+trialoverall <- trial %>%  
+  ungroup() %>% 
+  group_by(MilkType, PlateType) %>% 
+  summarise(trialMean = mean(trialmean))
+
+##pore size level for raw skim
+pore0.8 <- rawmeans %>% 
+  ungroup() %>% 
+  group_by(PoreSize, MilkType, PlateType) %>% 
+  filter(PoreSize == 0.8) %>% 
+  ungroup() %>% 
+  group_by(MilkType, PlateType)  %>% 
+  summarise(poreMean = mean(meanConcentration))
+
+##pore1.2
+pore1.2 <- rawmeans %>% 
+  ungroup() %>% 
+  group_by(PoreSize, MilkType, PlateType) %>% 
+  filter(PoreSize == 1.2) %>% 
+  ungroup() %>% 
+  group_by(MilkType, PlateType)  %>% 
+  summarise(poreMean = mean(meanConcentration))
+  
+```
+
+

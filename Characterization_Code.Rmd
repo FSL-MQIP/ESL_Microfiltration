@@ -1,0 +1,202 @@
+---
+title: "MF_Characterization"
+author: "T.T. LOTT"
+date: "10/22/22"
+output: github_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+#Load packages
+```{r}
+library(dplyr)
+library(vegan)
+library(ggplot2)
+library(ggtext)
+library(readr)
+library(tidyverse)
+library(wesanderson)
+library(indicspecies)
+```
+
+###Data reading
+```{r}
+##read in csv files
+allisos <- read.csv("Characterization_Data.csv", na.strings = c("", "NA")) %>% 
+  filter(MilkType != "BuffCont")
+```
+
+
+###Data transformation and filtering
+```{r}
+#filter characterized isolates only
+character <- allisos %>% 
+  filter(!is.na(rpoBAT) | !is.na(Genus) | !is.na(Family))
+
+
+#raw milk characterized
+rawcharacter <- character %>% 
+  filter(Day == 0) %>% 
+  filter(MilkType != "skim" | MilkType != "whole" | MilkType != "PostPumpSkim" | MilkType != "PreMFAlkalineWater") %>% 
+  filter(PlateType == "APC") %>% 
+  distinct(Trial, Raw.Milk.Type, PoreSize, Genus) %>% 
+  filter(!is.na(Raw.Milk.Type)) %>% 
+  filter(!is.na(Genus))
+  
+
+#filter for only shelf life
+shelflife <- character %>% 
+  filter(Day != 0) %>% 
+  filter(Gramstain == "positive") %>% #remove to include gram negative
+  mutate(rpoBna = row_number() * is.na(rpoBAT)) %>% 
+  distinct(Trial, MilkType, PoreSize, Day, StorageTemp, Genus, Species, rpoBAT, rpoBna, Gramstain) %>% 
+  mutate(Bacteria = paste(Genus, Species, sep = " "))
+
+```
+
+```{r}
+##plot 16S rDNA species identification
+
+
+#by trial
+ggplot(data=shelflife, aes(x=Trial, fill = Bacteria)) +
+  geom_bar(position = "fill") + 
+  xlab("Trial") + ylab("Proportion") +
+  theme(plot.title = element_text(face = "bold")) +
+  ggtitle("(a)") +
+  scale_fill_manual(labels = c("*Bacillus cereus* s.s.", "*Bacillus licheniformis*", "*Bacillus mosaicus*", "*Bacillus pumilus*", "*Bacillus safensis*", "*Microbacterium* sp.", "*Paenibacillus odorifer*", "*Paenibacillus* sp.", "*Paenibacillus* sp. 1", "*Paenibacillus* sp. 6", "*Paenibacillus tritici*", "*Rhodoccus* sp.", "*Staphylococcus* sp."), values = c("brown4", "firebrick3", "tomato2", "lightcoral", "lightpink", "lightgoldenrod1", "deepskyblue4", "cadetblue", "lightseagreen", "lightskyblue", "slategray1", "slateblue", "orchid")) +
+  theme(legend.text = element_markdown(), legend.key.size = unit(0.5, "cm"))
+
+#ggsave("mfCharacterTrial051023.jpeg", type = "cairo", dpi = 600)
+
+#by pore size
+ggplot(data=shelflife, aes(x=factor(PoreSize), fill = Bacteria)) +
+  geom_bar(position = "fill") +
+  xlab("Pore Size") + ylab("Proportion") +
+  theme(plot.title = element_text(face = "bold")) +
+  ggtitle("(b)") +
+    scale_fill_manual(labels = c("*Bacillus cereus* s.s.", "*Bacillus licheniformis*", "*Bacillus mosaicus*", "*Bacillus pumilus*", "*Bacillus safensis*", "*Microbacterium* sp.", "*Paenibacillus odorifer*", "*Paenibacillus* sp.", "*Paenibacillus* sp. 1", "*Paenibacillus* sp. 6", "*Paenibacillus tritici*", "*Rhodoccus* sp.", "*Staphylococcus* sp."), values = c("brown4", "firebrick3", "tomato2", "lightcoral", "lightpink", "lightgoldenrod1", "deepskyblue4", "cadetblue", "lightseagreen", "lightskyblue", "slategray1", "slateblue", "orchid")) +
+  theme(legend.text = element_markdown(), legend.key.size = unit(0.5, "cm"))
+
+#ggsave("mfCharacterPoreSize051023.jpeg", type = "cairo", dpi = 600)
+
+#by milk type
+ggplot(data=shelflife, aes(x=MilkType, fill = Bacteria)) +
+  geom_bar(position = "fill") +
+  xlab("Milk Type") + ylab("Proportion") +
+  theme(plot.title = element_text(face = "bold")) +
+  ggtitle("(c)") +
+  scale_fill_manual(labels = c("*Bacillus cereus* s.s.", "*Bacillus licheniformis*", "*Bacillus mosaicus*", "*Bacillus pumilus*", "*Bacillus safensis*", "*Microbacterium* sp.", "*Paenibacillus odorifer*", "*Paenibacillus* sp.", "*Paenibacillus* sp. 1", "*Paenibacillus* sp. 6", "*Paenibacillus tritici*", "*Rhodoccus* sp.", "*Staphylococcus* sp."), values = c("brown4", "firebrick3", "tomato2", "lightcoral", "lightpink", "lightgoldenrod1", "deepskyblue4", "cadetblue", "lightseagreen", "lightskyblue", "slategray1", "slateblue", "orchid")) +
+  theme(legend.text = element_markdown(), legend.key.size = unit(0.5, "cm"))
+
+#ggsave("mfCharacterMilkType051023.jpeg", type = "cairo", dpi = 600)
+
+#by storage temp
+ggplot(data=shelflife, aes(x=factor(StorageTemp), fill = Bacteria)) +
+  geom_bar(position = "fill")  +
+  xlab("Storage Temperature") + ylab("Proportion") +
+  theme(plot.title = element_text(face = "bold")) +
+  ggtitle("(d)") +
+  scale_fill_manual(labels = c("*Bacillus cereus* s.s.", "*Bacillus licheniformis*", "*Bacillus mosaicus*", "*Bacillus pumilus*", "*Bacillus safensis*", "*Microbacterium* sp.", "*Paenibacillus odorifer*", "*Paenibacillus* sp.", "*Paenibacillus* sp. 1", "*Paenibacillus* sp. 6", "*Paenibacillus tritici*", "*Rhodoccus* sp.", "*Staphylococcus* sp."), values = c("brown4", "firebrick3", "tomato2", "lightcoral", "lightpink", "lightgoldenrod1", "deepskyblue4", "cadetblue", "lightseagreen", "lightskyblue", "slategray1", "slateblue", "orchid")) +
+  theme(legend.text = element_markdown(), legend.key.size = unit(0.5, "cm"))
+
+#ggsave("mfCharacterStorageTemp051023.jpeg", type = "cairo", dpi = 600)
+```
+
+```{r}
+#Plot raw milk characterized isolates
+ggplot(data=rawcharacter, aes(x=factor(Raw.Milk.Type, level = c('Raw Milk', 'Raw Cream', 'Raw Skim', 'MF Skim', 'Standardized')), fill = Genus)) +
+  geom_bar(position = "fill") +
+  xlab("Milk Type") + ylab("Proportion") +
+  scale_fill_manual(labels = c("*Acinetobacter*", "*Bacillus*", "*Enterococcus*", "*Lactococcus*", "*Leuconostoc*", "*Microbacterium*", "*Pseudomonas*", "*Psychrobacter*", "*Streptococcus*"), values = c("orangered4", "firebrick3", "tomato1", "chocolate1", "orange1", "lightgoldenrod1", "darkolivegreen3", "cornflowerblue", "plum")) +
+  theme(legend.text = element_markdown(), axis.text.x = element_text(size = 7))
+
+#ggsave("rawmilkcharacter051023.jpeg", type = "cairo", dpi = 600)
+```
+
+
+###NMDS at level of species
+```{r}
+
+#create a matrix summarizing Unique species presence/absence per Trial-HTST_Temp-Storage_Temp
+speciesmatrix <- shelflife %>% 
+  filter(!is.na(Species)) %>% 
+  group_by(Trial, MilkType, PoreSize, StorageTemp, Bacteria) %>% 
+  summarise(n()) %>%
+  mutate(presence = 1) %>%
+  pivot_wider(id_cols = c(Trial, MilkType, PoreSize, StorageTemp), names_from = Bacteria, values_from = presence, values_fill = 0)
+
+#NMDS with species Matrix
+set.seed(88)
+species.nmds = metaMDS(speciesmatrix[,-1:-4],
+                     k=2, trymax=1000)
+
+#convergence reached
+
+#extract NMDS scores (x and y coordinates)
+data.scores_spp = as.data.frame(scores(species.nmds))
+
+#add columns to data frame 
+data.scores_spp$Trial = speciesmatrix$Trial
+data.scores_spp$MilkType = speciesmatrix$MilkType
+data.scores_spp$StorageTemp = speciesmatrix$StorageTemp
+data.scores_spp$PoreSize = speciesmatrix$PoreSize
+ 
+head(data.scores_spp)
+
+#plot data scores
+
+ggplot(data.scores_spp, aes(x = NMDS1, y = NMDS2)) + 
+    geom_point(size = 4, aes(shape = factor(StorageTemp), colour = factor(PoreSize)))+ 
+    theme(axis.text.y = element_text(colour = "black", size = 12, face = "bold"), 
+    axis.text.x = element_text(colour = "black", face = "bold", size = 12), 
+    legend.text = element_text(size = 12, face ="bold", colour ="black"), 
+    legend.position = "right", axis.title.y = element_text(face = "bold", size = 14), 
+    axis.title.x = element_text(face = "bold", size = 14, colour = "black"), 
+    legend.title = element_text(size = 14, colour = "black", face = "bold"), 
+    panel.background = element_blank(), panel.border = element_rect(colour = "black", fill = NA, size = 1.2),
+    legend.key=element_blank()) + 
+    labs(x = "NMDS1", colour = "Storage Temperature (\u00B0C)", y = "NMDS2", shape = "HTST Temperature (\u00B0C)")  + 
+    scale_colour_manual(values = wes_palette("Darjeeling1", n=3)) 
+  
+
+#ANOSIM
+
+Ano_spp_StorageTemp = anosim(speciesmatrix[,-1:-4], speciesmatrix$StorageTemp, permutations = 9999)
+
+Ano_spp_StorageTemp
+#significant
+
+Ano_spp_PoreSize = anosim(speciesmatrix[,-1:-4], speciesmatrix$PoreSize, permutations = 9999)
+
+Ano_spp_PoreSize
+#not significant
+
+
+Ano_spp_MilkType = anosim(speciesmatrix[,-1:-4], speciesmatrix$MilkType, permutations = 9999)
+
+Ano_spp_MilkType
+#not significant
+
+Ano_spp_Trial = anosim(speciesmatrix[,-1:-4], speciesmatrix$Trial, permutations = 9999)
+
+Ano_spp_Trial
+#significant
+
+#indicator species package for identifying significant differences
+sig_spp_stor = multipatt(speciesmatrix[,-1:-4], speciesmatrix$StorageTemp, control = how(nperm=9999))
+
+summary(sig_spp_stor)
+
+sig_spp_trial = multipatt(speciesmatrix[,-1:-4], speciesmatrix$Trial, control = how(nperm=9999))
+
+summary(sig_spp_trial)
+
+sig_spp_pore = multipatt(speciesmatrix[,-1:-4], speciesmatrix$PoreSize, control = how(nperm=9999))
+
+summary(sig_spp_pore)
+
+
+```
